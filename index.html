@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一円おみくじ</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--vermillion:#c0392b;--deep-red:#7b1a10;--gold:#d4a017;--light-gold:#f0d060;--cream:#fdf6e3;--dark:#1a0a00;--ink:#2c1a0e;--paper:#f5ead0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:var(--dark);font-family:'Noto Serif JP',serif;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.bg{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 30%,#3a1005 0%,#1a0a00 60%,#0a0400 100%)}
+.bg::before{content:'';position:fixed;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(180,100,20,.04) 60px,rgba(180,100,20,.04) 61px),repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(180,100,20,.04) 60px,rgba(180,100,20,.04) 61px)}
+.torii{position:fixed;top:0;left:50%;transform:translateX(-50%);width:320px;height:160px;opacity:.18;pointer-events:none}
+.torii::before{content:'';position:absolute;top:20px;left:50%;transform:translateX(-50%);width:280px;height:22px;background:var(--vermillion);border-radius:3px}
+.torii::after{content:'';position:absolute;top:48px;left:50%;transform:translateX(-50%);width:240px;height:14px;background:var(--vermillion)}
+.torii-pillar{position:absolute;bottom:0;width:18px;height:130px;background:var(--vermillion);border-radius:2px}
+.torii-pillar.left{left:60px}.torii-pillar.right{right:60px}
+.petal{position:fixed;width:8px;height:10px;background:rgba(255,200,200,.6);border-radius:50% 0 50% 0;animation:fall linear infinite;pointer-events:none}
+@keyframes fall{0%{transform:translateY(-20px) rotate(0);opacity:.7}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+.container{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;gap:28px;padding:20px}
+.title-kanji{font-size:clamp(38px,10vw,64px);font-weight:900;color:var(--light-gold);letter-spacing:.2em;text-shadow:0 0 30px rgba(212,160,23,.5),2px 2px 0 var(--deep-red);line-height:1;text-align:center}
+.title-sub{font-size:13px;color:rgba(240,200,80,.6);letter-spacing:.4em;margin-top:6px;font-weight:300;text-align:center}
+.balance-display{background:rgba(255,255,255,.05);border:1px solid rgba(212,160,23,.2);border-radius:4px;padding:10px 24px;text-align:center}
+.balance-label{font-size:10px;color:rgba(240,200,80,.5);letter-spacing:.3em}
+.balance-amount{font-size:24px;color:var(--light-gold);font-weight:700}
+.balance-amount span{font-size:14px;font-weight:300;margin-left:2px}
+.box-area{display:flex;flex-direction:column;align-items:center;gap:20px}
+.omikuji-box{width:140px;height:180px;background:linear-gradient(160deg,#8b0000 0%,#5a0000 50%,#3a0000 100%);border-radius:8px 8px 4px 4px;border:2px solid rgba(212,160,23,.4);box-shadow:0 0 40px rgba(180,20,20,.3),inset 0 1px 0 rgba(255,200,100,.2);position:relative;cursor:pointer}
+.omikuji-box::before{content:'御神籤';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:22px;font-weight:700;color:var(--light-gold);letter-spacing:.2em;writing-mode:vertical-rl;text-shadow:0 0 10px rgba(240,200,80,.5)}
+.coin-area{display:flex;align-items:center;gap:16px}
+.coin-display{width:56px;height:56px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f5d060,#c8a820,#8a6800);border:2px solid #d4a017;box-shadow:0 4px 12px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,230,100,.5);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#5a3a00}
+.coin-display::after{content:'¥1'}
+.coin-label{color:rgba(240,200,80,.7);font-size:13px;letter-spacing:.2em}
+.draw-btn{background:linear-gradient(135deg,var(--vermillion) 0%,var(--deep-red) 100%);color:var(--light-gold);border:2px solid rgba(212,160,23,.6);padding:16px 48px;font-size:18px;font-family:'Noto Serif JP',serif;font-weight:700;letter-spacing:.3em;border-radius:4px;cursor:pointer;transition:all .3s;box-shadow:0 4px 20px rgba(192,57,43,.4);position:relative;overflow:hidden}
+.draw-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(192,57,43,.6)}
+.draw-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.result-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .5s}
+.result-overlay.show{opacity:1;pointer-events:all}
+.result-card{width:min(340px,90vw);background:var(--paper);border:3px solid var(--gold);border-radius:4px;padding:40px 32px;text-align:center;position:relative;transform:translateY(40px) scale(.9);transition:transform .6s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 60px rgba(212,160,23,.3)}
+.result-overlay.show .result-card{transform:translateY(0) scale(1)}
+.result-card::before{content:'';position:absolute;top:8px;left:8px;right:8px;bottom:8px;border:1px solid rgba(212,160,23,.4);border-radius:2px;pointer-events:none}
+.result-rank{font-size:52px;font-weight:900;letter-spacing:.1em;margin-bottom:8px;line-height:1}
+.result-rank.daikichi{color:#c0392b}.result-rank.kichi{color:#8b0000}.result-rank.chukichi{color:#6b4226}.result-rank.shokichi{color:#5a5a00}.result-rank.suekichi{color:#2d4a2d}.result-rank.kyo{color:#2c2c5e}
+.result-prize{font-size:14px;color:var(--ink);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.3);border-radius:2px;padding:8px 16px;margin:16px 0}
+.result-prize.win{background:rgba(192,57,43,.1);border-color:var(--vermillion);color:var(--deep-red);font-weight:700;font-size:16px;animation:pulse 1s ease infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.3)}50%{box-shadow:0 0 0 8px rgba(192,57,43,0)}}
+.result-message{font-size:12px;color:#6b4226;line-height:1.8;margin:12px 0;padding:0 8px}
+.close-btn{margin-top:20px;background:var(--ink);color:var(--light-gold);border:1px solid rgba(212,160,23,.4);padding:12px 40px;font-family:'Noto Serif JP',serif;font-size:14px;letter-spacing:.3em;border-radius:2px;cursor:pointer;transition:all .2s}
+.close-btn:hover{background:var(--vermillion)}
+.history{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:300px}
+.history-badge{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid;letter-spacing:.1em}
+.history-badge.daikichi{background:rgba(192,57,43,.15);border-color:#c0392b;color:#c0392b}
+.history-badge.kichi{background:rgba(139,0,0,.1);border-color:#8b0000;color:#8b0000}
+.history-badge.kyo{background:rgba(44,44,94,.1);border-color:#2c2c5e;color:#6666aa}
+.history-badge.other{background:rgba(240,200,80,.1);border-color:#d4a017;color:#d4a017}
+.coin-fly{position:fixed;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f5d060,#c8a820);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#5a3a00;z-index:200;pointer-events:none;animation:coinFly .8s ease-in forwards}
+@keyframes coinFly{0%{opacity:1;transform:scale(1) rotate(0)}50%{opacity:1;transform:scale(1.3) rotate(180deg) translateY(-40px)}100%{opacity:0;transform:scale(.3) rotate(360deg) translateY(80px)}}
+@keyframes shake{0%,100%{transform:rotate(0)}20%{transform:rotate(-4deg)}40%{transform:rotate(4deg)}60%{transform:rotate(-3deg)}80%{transform:rotate(2deg)}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="torii"><div class="torii-pillar left"></div><div class="torii-pillar right"></div></div>
+<div class="container">
+  <div>
+    <div class="title-kanji">一円御籤</div>
+    <div class="title-sub">ICHIEN OMIKUJI · 端数で運試し</div>
+  </div>
+  <div class="balance-display">
+    <div class="balance-label">電子マネー端数残高</div>
+    <div class="balance-amount" id="balance">9<span>円</span></div>
+  </div>
+  <div class="box-area">
+    <div class="omikuji-box" id="omikujiBox"></div>
+    <div class="coin-area">
+      <div class="coin-display"></div>
+      <div class="coin-label">1回 = 1円</div>
+    </div>
+    <button class="draw-btn" id="drawBtn" onclick="drawOmikuji()">おみくじを引く</button>
+  </div>
+  <div class="history" id="history"></div>
+</div>
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="result-rank" id="resultRank"></div>
+    <div class="result-prize" id="resultPrize"></div>
+    <div class="result-message" id="resultMessage"></div>
+    <button class="close-btn" onclick="closeResult()">閉じる</button>
+  </div>
+</div>
+<script>
+const RESULTS=[
+  {rank:'大吉',cls:'daikichi',prob:.005,prize:'🎊 Amazonギフト券 1,000円 当選！',win:true,msg:'天の恵みがあなたに降り注ぐ吉日。すべての願いが叶う時が来ました。'},
+  {rank:'吉',cls:'kichi',prob:.10,prize:'🎁 Amazonギフト券 100円 当選！',win:true,msg:'良いことが続いて訪れる兆しあり。積み重ねた努力が実を結ぶ日です。'},
+  {rank:'中吉',cls:'chukichi',prob:.18,prize:'次回 半額クーポン',win:false,msg:'穏やかな幸運が訪れます。日々の小さな喜びを大切にして。'},
+  {rank:'小吉',cls:'shokichi',prob:.25,prize:'はずれ（次の運を待とう）',win:false,msg:'小さな幸せが静かに宿っています。ゆっくりと前に進みましょう。'},
+  {rank:'末吉',cls:'suekichi',prob:.25,prize:'はずれ（次の運を待とう）',win:false,msg:'まだ運は温まっていません。明日の吉のための準備の時です。'},
+  {rank:'凶',cls:'kyo',prob:.195,prize:'はずれ（今日は控えめに…）',win:false,msg:'運気は底から上がるのみ。今日は慎重に行動しましょう。'},
+];
+let balance=9;
+function updateBalance(){
+  document.getElementById('balance').innerHTML=balance+'<span>円</span>';
+  const btn=document.getElementById('drawBtn');
+  btn.disabled=balance<1;
+  if(balance<1)btn.textContent='残高不足';
+}
+function getRandom(){
+  let r=Math.random(),c=0;
+  for(const res of RESULTS){c+=res.prob;if(r<c)return res;}
+  return RESULTS[RESULTS.length-1];
+}
+function spawnPetals(){
+  for(let i=0;i<6;i++){
+    const p=document.createElement('div');
+    p.className='petal';
+    p.style.cssText=`left:${Math.random()*100}vw;top:-10px;animation-duration:${3+Math.random()*4}s;animation-delay:${Math.random()*2}s`;
+    document.body.appendChild(p);
+    setTimeout(()=>p.remove(),8000);
+  }
+}
+function drawOmikuji(){
+  if(balance<1)return;
+  document.getElementById('drawBtn').disabled=true;
+  const coin=document.createElement('div');
+  coin.className='coin-fly';coin.textContent='¥1';
+  const rect=document.querySelector('.coin-display').getBoundingClientRect();
+  coin.style.cssText=`left:${rect.left}px;top:${rect.top}px`;
+  document.body.appendChild(coin);
+  setTimeout(()=>coin.remove(),900);
+  const box=document.getElementById('omikujiBox');
+  box.style.animation='none';box.offsetHeight;box.style.animation='shake 0.5s ease';
+  balance--;updateBalance();
+  setTimeout(()=>{
+    const res=getRandom();
+    const rank=document.getElementById('resultRank');
+    const prize=document.getElementById('resultPrize');
+    rank.textContent=res.rank;rank.className='result-rank '+res.cls;
+    prize.textContent=res.prize;prize.className='result-prize'+(res.win?' win':'');
+    document.getElementById('resultMessage').textContent=res.msg;
+    document.getElementById('resultOverlay').classList.add('show');
+    const h=document.getElementById('history');
+    const b=document.createElement('div');
+    const bc=['daikichi','kichi'].includes(res.cls)?res.cls:res.cls==='kyo'?'kyo':'other';
+    b.className='history-badge '+bc;b.textContent=res.rank;h.prepend(b);
+    if(h.children.length>10)h.lastChild.remove();
+    spawnPetals();
+    document.getElementById('drawBtn').disabled=balance<1;
+    if(balance>=1)document.getElementById('drawBtn').textContent='おみくじを引く';
+  },900);
+}
+function closeResult(){document.getElementById('resultOverlay').classList.remove('show');}
+spawnPetals();setInterval(spawnPetals,5000);updateBalance();
+</script>
+</body>
+</html>
