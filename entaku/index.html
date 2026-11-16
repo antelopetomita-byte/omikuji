@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI円卓">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>AI円卓 — ジャンル別に7つのAIへ同時質問</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root{--bg:#0d0f14;--panel:#161a22;--panel2:#1d222c;--line:#2a303c;--txt:#e8eaf0;--sub:#8b93a5;--acc:#e6b450;--ok:#5fcf8e;--ng:#ef6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 16px) env(safe-area-inset-left)}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px}
+h1{font-size:19px;margin:0;letter-spacing:.04em}h1 span{color:var(--acc)}
+.iconbtn{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:7px 11px;font-size:14px}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--sub);border-radius:999px;padding:7px 14px;font-size:14px;white-space:nowrap}
+.tab.on{background:var(--acc);border-color:var(--acc);color:#1a1405;font-weight:700}
+.desc{padding:0 16px;color:var(--sub);font-size:13px}
+.roster{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px}
+.chip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font-size:13px}
+.chip.off{opacity:.4;text-decoration:line-through}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.ask{padding:6px 16px}
+textarea{width:100%;min-height:92px;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:14px;padding:12px;font:inherit;resize:vertical}
+textarea:focus,input:focus,select:focus{outline:none;border-color:var(--acc)}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.btn{border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:700}
+.primary{flex:1;background:var(--acc);color:#1a1405}.primary:disabled{opacity:.5}
+.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+.stop{background:var(--ng);color:#fff}
+.opts{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin-top:8px}
+.opts label{display:flex;align-items:center;gap:5px}
+.status{padding:4px 16px;font-size:13px;color:var(--sub);min-height:20px}
+#cards{display:grid;gap:12px;padding:6px 16px}
+@media(min-width:900px){#cards{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.card.summary{border-color:var(--acc);grid-column:1/-1}
+.ch{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.ch b{font-size:14px}.mid{font-size:11px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.meta{font-size:11px;color:var(--sub);white-space:nowrap}
+.cb{padding:4px 14px 10px;font-size:14.5px;overflow-wrap:anywhere;max-height:none}
+.cb.collapsed{max-height:260px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.cb pre{background:#0a0c10;border-radius:10px;padding:10px;overflow-x:auto;font-size:12.5px}
+.cb code{font-family:ui-monospace,Menlo,monospace}
+.cb table{border-collapse:collapse;display:block;overflow-x:auto}.cb td,.cb th{border:1px solid var(--line);padding:4px 8px}
+.cb a{color:var(--acc)}
+.cf{display:flex;gap:6px;padding:0 12px 10px}
+.sm{font-size:12px;padding:6px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+.err{color:var(--ng);font-size:13px;padding:10px 14px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--sub);border-top-color:transparent;border-radius:50%;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.think{color:var(--sub);font-size:13px;padding:10px 0}
+dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:18px;padding:0;width:min(560px,94vw);max-height:86vh}
+dialog::backdrop{background:#000a}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.db{padding:14px 16px;overflow-y:auto;max-height:calc(86vh - 60px)}
+.db label.f{display:block;font-size:13px;color:var(--sub);margin:12px 0 4px}
+input[type=text],input[type=password],select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font:inherit;font-size:14px}
+.slot{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.slot .nm{font-size:13px;font-weight:700;display:flex;gap:6px;align-items:center}
+.slot select{grid-column:1/-1;font-size:12px;padding:8px}
+.hist{padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.hist small{color:var(--sub)}
+.note{font-size:12px;color:var(--sub);line-height:1.6}
+.welcome{margin:10px 16px;padding:14px;border:1px dashed var(--acc);border-radius:14px;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI<span>円卓</span></h1>
+  <div style="display:flex;gap:6px">
+    <button class="iconbtn" id="histBtn">履歴</button>
+    <button class="iconbtn" id="setBtn">設定</button>
+  </div>
+</header>
+
+<div id="welcome" class="welcome" hidden>
+  最初にOpenRouterのAPIキーを設定してください。<br>
+  <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--acc)">openrouter.ai/keys</a> でキーを作り、右上の「設定」に貼り付けるだけで使えます。キーはこの端末の中だけに保存されます。
+</div>
+
+<nav class="tabs" id="tabs"></nav>
+<div class="desc" id="desc"></div>
+<div class="roster" id="roster"></div>
+
+<section class="ask">
+  <textarea id="q" placeholder="質問を入力…（選んだジャンルのAI全員に同時に送ります）"></textarea>
+  <div class="opts">
+    <label><input type="checkbox" id="optJa" checked>日本語で回答</label>
+    <label><input type="checkbox" id="optShort">短めに</label>
+    <label><input type="checkbox" id="optAuto" checked>全員終わったら自動まとめ</label>
+  </div>
+  <div class="row">
+    <button class="btn primary" id="askBtn">7つのAIに聞く</button>
+    <button class="btn stop" id="stopBtn" hidden>止める</button>
+  </div>
+</section>
+<div class="status" id="status"></div>
+<main id="cards"></main>
+
+<dialog id="setDlg">
+  <div class="dh"><b>設定</b><button class="sm" data-close>閉じる</button></div>
+  <div class="db">
+    <label class="f">OpenRouter APIキー</label>
+    <input type="password" id="keyIn" placeholder="sk-or-v1-…" autocomplete="off">
+    <p class="note">キーはこの端末のブラウザにだけ保存され、OpenRouter以外には送られません。</p>
+    <label class="f">まとめ役のAI</label>
+    <select id="judgeSel"></select>
+    <label class="f" id="slotTitle">このジャンルのメンバー（タップで差し替え）</label>
+    <div id="slots"></div>
+    <div class="row">
+      <button class="btn ghost" id="resetSlots" style="flex:1">このジャンルをおすすめに戻す</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="refreshModels" style="flex:1">モデル一覧を最新に更新</button>
+    </div>
+    <p class="note" id="modelInfo"></p>
+    <button class="btn primary" id="saveSet" style="width:100%;margin-top:10px">保存</button>
+  </div>
+</dialog>
+
+<dialog id="histDlg">
+  <div class="dh"><b>履歴</b><button class="sm" data-close>閉じる</button></div>
+  <div class="db" id="histList"></div>
+</dialog>
+
+<script>
+"use strict";
+const API = "https://openrouter.ai/api/v1";
+const COLORS = {openai:"#10a37f",anthropic:"#d97757",google:"#4f8cff","x-ai":"#e8eaf0",deepseek:"#4d6bfe",qwen:"#8b5cf6",moonshotai:"#22c3e6","z-ai":"#3ddc97",mistralai:"#ff7000",perplexity:"#20b8cd","meta-llama":"#0866ff",meta:"#0866ff"};
+const NAMES = {openai:"ChatGPT",anthropic:"Claude",google:"Gemini","x-ai":"Grok",deepseek:"DeepSeek",qwen:"Qwen",moonshotai:"Kimi","z-ai":"GLM",mistralai:"Mistral",perplexity:"Perplexity","meta-llama":"Llama",meta:"Meta"};
+
+// 各スロット: v=提供元, p=優先パターン（上から順に探し、該当の中で一番新しいモデルを採用）, web=ネット検索を付ける
+const S = {
+  gpt:      {v:"openai",   label:"ChatGPT",  p:[/^openai\/gpt-[\d.]+-astra$/,/^openai\/gpt-[\d.]+-(sol|terra)$/,/^openai\/gpt-[\d.]+$/]},
+  gptCode:  {v:"openai",   label:"ChatGPT",  p:[/^openai\/gpt-[\d.]+-codex$/,/^openai\/gpt-[\d.]+-terra$/,/^openai\/gpt-[\d.]+-astra$/,/^openai\/gpt-[\d.]+$/]},
+  gptLogic: {v:"openai",   label:"ChatGPT",  p:[/^openai\/gpt-[\d.]+-sol$/,/^openai\/gpt-[\d.]+-astra$/,/^openai\/gpt-[\d.]+$/]},
+  gptFast:  {v:"openai",   label:"ChatGPT",  p:[/^openai\/gpt-[\d.]+-luna$/,/^openai\/gpt-[\d.]+-mini$/]},
+  opus:     {v:"anthropic",label:"Claude",   p:[/^anthropic\/claude-opus/]},
+  sonnet:   {v:"anthropic",label:"Claude",   p:[/^anthropic\/claude-sonnet/]},
+  haiku:    {v:"anthropic",label:"Claude",   p:[/^anthropic\/claude-haiku/]},
+  gemini:   {v:"google",   label:"Gemini",   p:[/^google\/gemini-[\d.]+-argon$/,/^google\/gemini-[\d.]+-carbon$/,/^google\/gemini-[\d.]+-pro/]},
+  geminiFast:{v:"google",  label:"Gemini",   p:[/^google\/gemini-[\d.]+-hydrogen$/,/^google\/gemini-[\d.]+-flash$/]},
+  grok:     {v:"x-ai",     label:"Grok",     p:[/^x-ai\/grok-[\d.]+$/]},
+  grokCode: {v:"x-ai",     label:"Grok",     p:[/^x-ai\/grok-build/,/^x-ai\/grok-code/,/^x-ai\/grok-[\d.]+$/]},
+  grokFast: {v:"x-ai",     label:"Grok",     p:[/^x-ai\/grok-[\d.]+-fast$/,/^x-ai\/grok-[\d.]+$/]},
+  deepseek: {v:"deepseek", label:"DeepSeek", p:[/^deepseek\/deepseek-v[\d.]+$/,/^deepseek\/deepseek-(chat|r\d)/]},
+  deepseekR:{v:"deepseek", label:"DeepSeek", p:[/^deepseek\/deepseek-r\d/,/reason|think/,/^deepseek\/deepseek-v[\d.]+$/]},
+  qwen:     {v:"qwen",     label:"Qwen",     p:[/^qwen\/qwen[\d.]*-max/,/^qwen\/qwen[\d.]*-plus/]},
+  qwenCode: {v:"qwen",     label:"Qwen",     p:[/^qwen\/qwen[\d.]*-coder(?!.*(flash|mini|\d+b))/,/^qwen\/qwen[\d.]*-coder/,/^qwen\/qwen[\d.]*-max/]},
+  qwenFast: {v:"qwen",     label:"Qwen",     p:[/^qwen\/qwen[\d.]*-flash/,/^qwen\/qwen[\d.]*-plus/]},
+  kimi:     {v:"moonshotai",label:"Kimi",    p:[/^moonshotai\/kimi-k[\d.]+(?!.*(mini|lite))/,/^moonshotai\/kimi/]},
+  glm:      {v:"z-ai",     label:"GLM",      p:[/^z-ai\/glm-[\d.]+$/,/^z-ai\/glm/]},
+  mistral:  {v:"mistralai",label:"Mistral",  p:[/^mistralai\/mistral-large/,/^mistralai\/mistral-medium/]},
+  mistralFast:{v:"mistralai",label:"Mistral",p:[/^mistralai\/mistral-small/,/^mistralai\/ministral/]},
+  pplxPro:  {v:"perplexity",label:"Perplexity",p:[/^perplexity\/sonar-pro-search/,/^perplexity\/sonar-pro/]},
+  pplxR:    {v:"perplexity",label:"Perplexity",p:[/^perplexity\/sonar-reasoning-pro/,/^perplexity\/sonar-reasoning/]},
+};
+const w = (k)=>({...S[k],key:k,web:true});
+const k = (x)=>({...S[x],key:x});
+
+const GENRES = [
+  {id:"general",name:"総合",desc:"どんな質問にも強い各社の最上位モデルで多数決。",slots:[k("gpt"),k("opus"),k("gemini"),k("grok"),k("deepseek"),k("qwen"),k("kimi")]},
+  {id:"code",name:"プログラミング",desc:"コード生成・バグ修正・設計に強いモデル。",slots:[k("opus"),k("gptCode"),k("gemini"),k("grokCode"),k("deepseek"),k("qwenCode"),k("glm")]},
+  {id:"news",name:"最新情報・調査",desc:"ネット検索付き。ニュース・価格・今の状況を調べる質問向け。",slots:[k("pplxPro"),k("pplxR"),w("grok"),w("gemini"),w("gpt"),w("opus")]},
+  {id:"write",name:"文章・創作",desc:"文章力・表現力に定評のあるモデル。コピー、物語、手紙など。",slots:[k("opus"),k("sonnet"),k("gpt"),k("gemini"),k("kimi"),k("grok"),k("mistral")]},
+  {id:"logic",name:"数学・論理",desc:"推論・計算・パズルに強い思考型モデル。",slots:[k("gptLogic"),k("gemini"),k("deepseekR"),k("grok"),k("qwen"),k("opus"),k("glm")]},
+  {id:"biz",name:"ビジネス・戦略",desc:"事業アイデア、収益化、マーケ、意思決定の壁打ち。",slots:[k("opus"),k("gpt"),k("gemini"),k("grok"),k("qwen"),k("deepseek"),k("mistral")]},
+  {id:"ja",name:"日本語・翻訳",desc:"自然な日本語・翻訳・敬語チェックに強いモデル。",slots:[k("opus"),k("gpt"),k("gemini"),k("qwen"),k("kimi"),k("glm"),k("sonnet")]},
+  {id:"fast",name:"爆速・格安",desc:"軽くて速いモデルだけ。ちょっとした質問をタダ同然で。",slots:[k("geminiFast"),k("gptFast"),k("haiku"),k("grokFast"),k("deepseek"),k("qwenFast"),k("mistralFast")]},
+];
+
+// ---------- storage ----------
+const LS = {
+  get(k,d){try{const v=localStorage.getItem("entaku."+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("entaku."+k,JSON.stringify(v))}catch(e){}}
+};
+let state = {
+  key: LS.get("key",""),
+  genre: LS.get("genre","general"),
+  overrides: LS.get("overrides",{}), // {genreId:{idx:modelId}}
+  disabled: LS.get("disabled",{}),   // {genreId:{idx:true}}
+  judge: LS.get("judge",""),
+};
+let MODELS = [];   // {id,name,created,pricing}
+let running = [];  // AbortControllers
+let lastRun = null;
+
+const $ = (s)=>document.querySelector(s);
+const esc = (s)=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const md = (s)=>DOMPurify.sanitize(marked.parse(s||""),{ADD_ATTR:["target"]});
+marked.setOptions({breaks:true,gfm:true});
+
+// ---------- models ----------
+const BAD = /(:free|:batch|:extended)$|image|audio|tts|stt|speech|embed|decision|decider|guard|transcri|realtime|video|music|^~|-preview-\d|-\d{4}-\d{2}-\d{2}$|deep-research/i;
+async function loadModels(force){
+  const cache = LS.get("models",null);
+  if(!force && cache && Date.now()-cache.t < 6*3600e3){MODELS=cache.m;return}
+  try{
+    const r = await fetch(API+"/models");
+    const j = await r.json();
+    MODELS = j.data.filter(m=>{
+      const out = (m.architecture&&m.architecture.output_modalities)||["text"];
+      return out.includes("text") && !out.includes("image") && !BAD.test(m.id);
+    }).map(m=>({id:m.id,name:m.name,created:m.created||0,pin:+(m.pricing&&m.pricing.prompt||0),pout:+(m.pricing&&m.pricing.completion||0)}));
+    LS.set("models",{t:Date.now(),m:MODELS});
+  }catch(e){ if(cache) MODELS=cache.m; }
+}
+function resolve(slot){
+  const pool = MODELS.filter(m=>m.id.startsWith(slot.v+"/"));
+  for(const re of slot.p){
+    const hit = pool.filter(m=>re.test(m.id)).sort((a,b)=>b.created-a.created);
+    if(hit.length) return hit[0].id;
+  }
+  const any = pool.sort((a,b)=>b.created-a.created)[0];
+  return any?any.id:null;
+}
+function genre(){return GENRES.find(g=>g.id===state.genre)||GENRES[0]}
+function members(g){
+  g = g||genre();
+  return g.slots.map((s,i)=>{
+    const ov = (state.overrides[g.id]||{})[i];
+    const id = ov || resolve(s);
+    const vendor = id?id.split("/")[0]:s.v;
+    return {i,slot:s,id,vendor,label:(ov?NAMES[vendor]||vendor:s.label),web:s.web,off:!!(state.disabled[g.id]||{})[i]};
+  });
+}
+function mName(id){const m=MODELS.find(x=>x.id===id);return m?m.name.replace(/^[^:]+:\s*/,""):id}
+
+// ---------- UI ----------
+function renderTabs(){
+  $("#tabs").innerHTML = GENRES.map(g=>`<button class="tab ${g.id===state.genre?"on":""}" data-g="${g.id}">${g.name}</button>`).join("");
+  $("#desc").textContent = genre().desc;
+  renderRoster();
+}
+function renderRoster(){
+  const ms = members();
+  $("#roster").innerHTML = ms.map(m=>`<button class="chip ${m.off?"off":""}" data-i="${m.i}" title="${esc(m.id||"")}"><span class="dot" style="background:${COLORS[m.vendor]||"#888"}"></span>${esc(m.label)}${m.web?" 🌐":""}<span style="color:var(--sub);font-size:11px">${esc(m.id?mName(m.id):"未取得")}</span></button>`).join("");
+  const n = ms.filter(m=>!m.off&&m.id).length;
+  $("#askBtn").textContent = `${n}つのAIに同時に聞く`;
+}
+$("#tabs").addEventListener("click",e=>{
+  const b=e.target.closest(".tab");if(!b)return;
+  state.genre=b.dataset.g;LS.set("genre",state.genre);renderTabs();
+});
+$("#roster").addEventListener("click",e=>{
+  const c=e.target.closest(".chip");if(!c)return;
+  const g=state.genre, i=c.dataset.i;
+  state.disabled[g]=state.disabled[g]||{};
+  state.disabled[g][i]=!state.disabled[g][i];
+  LS.set("disabled",state.disabled);renderRoster();
+});
+
+// ---------- ask ----------
+function sysPrompt(){
+  const parts=["あなたは複数のAIが同じ質問に答えて比較される場に参加しています。正確さを最優先し、不確かな点は不確かだと明記してください。"];
+  if($("#optJa").checked) parts.push("回答は必ず日本語で書いてください。");
+  if($("#optShort").checked) parts.push("要点を絞って短く答えてください（目安300字以内）。");
+  return parts.join("");
+}
+function card(m,idx){
+  const el=document.createElement("article");el.className="card";
+  el.innerHTML=`<div class="ch"><span class="dot" style="background:${COLORS[m.vendor]||"#888"}"></span><b>${esc(m.label)}</b><span class="mid">${esc(m.id)}${m.web?" · 🌐検索":""}</span><span class="meta"><span class="spin"></span></span></div>
+  <div class="cb"><div class="think">考え中…</div></div>
+  <div class="cf" hidden><button class="sm" data-act="copy">コピー</button><button class="sm" data-act="fold">たたむ</button><button class="sm" data-act="retry">再実行</button></div>`;
+  el.dataset.idx=idx;
+  return el;
+}
+async function streamChat({model,messages,web,signal,onDelta}){
+  const body={model,messages,stream:true,usage:{include:true}};
+  if(web) body.plugins=[{id:"web",max_results:5}];
+  const r=await fetch(API+"/chat/completions",{method:"POST",signal,headers:{
+    "Authorization":"Bearer "+state.key,"Content-Type":"application/json",
+    "HTTP-Referer":location.origin+location.pathname,"X-Title":"AI Entaku"},body:JSON.stringify(body)});
+  if(!r.ok){let t=await r.text();try{t=JSON.parse(t).error.message}catch(e){}throw new Error(`${r.status}: ${t}`)}
+  const rd=r.body.getReader();const dec=new TextDecoder();let buf="",text="",usage=null,cites=[];
+  for(;;){
+    const {done,value}=await rd.read();if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    let nl;
+    while((nl=buf.indexOf("\n"))>=0){
+      const line=buf.slice(0,nl).trim();buf=buf.slice(nl+1);
+      if(!line.startsWith("data:"))continue;
+      const d=line.slice(5).trim();if(d==="[DONE]")continue;
+      try{
+        const j=JSON.parse(d);
+        if(j.error) throw new Error(j.error.message||"error");
+        const ch=j.choices&&j.choices[0];
+        const piece=ch&&ch.delta&&ch.delta.content;
+        if(piece){text+=piece;onDelta(text)}
+        const ann=ch&&ch.delta&&ch.delta.annotations;
+        if(ann) ann.forEach(a=>{if(a.url_citation)cites.push(a.url_citation)});
+        if(j.citations) j.citations.forEach(u=>cites.push({url:u}));
+        if(j.usage) usage=j.usage;
+      }catch(e){ if(e.message && !/JSON/.test(e.message)) throw e; }
+    }
+  }
+  return {text,usage,cites};
+}
+function fmtCost(u){ if(!u) return ""; const c=u.cost; return c!=null?` · ¥${(c*155).toFixed(c*155<1?2:1)}`:""; }
+function citeHtml(cites){
+  const seen=new Set();const list=cites.filter(c=>c.url&&!seen.has(c.url)&&seen.add(c.url)).slice(0,8);
+  if(!list.length) return "";
+  return `<p style="font-size:12px;color:var(--sub)">出典: ${list.map((c,i)=>`<a href="${esc(c.url)}" target="_blank">[${i+1}] ${esc(c.title||new URL(c.url).hostname)}</a>`).join(" ")}</p>`;
+}
+async function runOne(m,el,q,results){
+  const ac=new AbortController();running.push(ac);
+  const body=el.querySelector(".cb"), meta=el.querySelector(".meta");
+  const t0=performance.now();let raf=0;
+  const res={label:m.label,id:m.id,text:"",ok:false};results[el.dataset.idx]=res;
+  try{
+    const out=await streamChat({model:m.id,web:m.web,signal:ac.signal,
+      messages:[{role:"system",content:sysPrompt()},{role:"user",content:q}],
+      onDelta:(t)=>{res.text=t;if(!raf)raf=requestAnimationFrame(()=>{raf=0;body.innerHTML=md(t)})}});
+    cancelAnimationFrame(raf);
+    res.text=out.text;res.ok=!!out.text;
+    body.innerHTML=md(out.text||"（空の回答）")+citeHtml(out.cites);
+    meta.textContent=`${((performance.now()-t0)/1000).toFixed(1)}秒${fmtCost(out.usage)}`;
+  }catch(e){
+    meta.textContent=ac.signal.aborted?"停止":"エラー";
+    body.innerHTML=(res.text?md(res.text):"")+`<div class="err">${esc(ac.signal.aborted?"停止しました":e.message)}</div>`;
+  }
+  el.querySelector(".cf").hidden=false;
+  running=running.filter(x=>x!==ac);
+}
+async function ask(){
+  const q=$("#q").value.trim();
+  if(!state.key){openSettings();return}
+  if(!q) {$("#q").focus();return}
+  const ms=members().filter(m=>!m.off&&m.id);
+  if(!ms.length) return;
+  const cards=$("#cards");cards.innerHTML="";
+  const results=[];
+  lastRun={q,genre:genre().name,results,ms,t:Date.now()};
+  $("#askBtn").disabled=true;$("#stopBtn").hidden=false;
+  setStatus(`${ms.length}つのAIに同時送信中…`);
+  const t0=performance.now();
+  const jobs=ms.map((m,idx)=>{const el=card(m,idx);cards.appendChild(el);return runOne(m,el,q,results).then(()=>{
+    const done=results.filter(r=>r&&(r.ok||r.text!==undefined)).length;
+  })});
+  // 進捗表示
+  const tick=setInterval(()=>{const d=ms.length-running.length;setStatus(`回答 ${d}/${ms.length}　${((performance.now()-t0)/1000).toFixed(0)}秒`)},500);
+  await Promise.allSettled(jobs);
+  clearInterval(tick);
+  $("#askBtn").disabled=false;$("#stopBtn").hidden=true;
+  const okN=results.filter(r=>r&&r.ok).length;
+  setStatus(`${okN}/${ms.length}件そろいました（${((performance.now()-t0)/1000).toFixed(1)}秒）`);
+  saveHistory();
+  addSummaryButton();
+  if($("#optAuto").checked && okN>=2) summarize();
+}
+function setStatus(t){$("#status").textContent=t}
+function addSummaryButton(){
+  if($("#sumBtnWrap")) return;
+  const d=document.createElement("div");d.id="sumBtnWrap";d.style.cssText="padding:4px 16px";
+  d.innerHTML=`<button class="btn ghost" style="width:100%" id="sumBtn">🧭 全員の回答をまとめる（共通点・違い・結論）</button>`;
+  $("#cards").before(d);
+  $("#sumBtn").onclick=summarize;
+}
+function judgeId(){
+  if(state.judge && MODELS.some(m=>m.id===state.judge)) return state.judge;
+  return resolve(S.opus)||resolve(S.gpt)||resolve(S.gemini);
+}
+async function summarize(){
+  if(!lastRun) return;
+  const ok=lastRun.results.filter(r=>r&&r.ok);
+  if(ok.length<2) return;
+  document.querySelector(".card.summary")?.remove();
+  const jid=judgeId();
+  const el=document.createElement("article");el.className="card summary";
+  el.innerHTML=`<div class="ch"><span class="dot" style="background:var(--acc)"></span><b>まとめ</b><span class="mid">${esc(jid)} が${ok.length}件を比較</span><span class="meta"><span class="spin"></span></span></div><div class="cb"><div class="think">比較中…</div></div>`;
+  $("#cards").prepend(el);
+  const body=el.querySelector(".cb"),meta=el.querySelector(".meta");
+  const ac=new AbortController();running.push(ac);
+  const prompt=`次の質問に対して${ok.length}つのAIが回答しました。これらを比較して日本語でまとめてください。
+
+## 出力形式
+1. **結論**（全体を踏まえた最も確からしい答えを3〜5行で）
+2. **多くのAIが一致した点**
+3. **意見が分かれた点**（どのAIが何と言ったか）
+4. **注意すべき誤り・怪しい主張**（あれば）
+5. **一番良かった回答**とその理由
+
+## 質問
+${lastRun.q}
+
+${ok.map((r,i)=>`## 回答${i+1}: ${r.label}（${r.id}）\n${r.text.slice(0,12000)}`).join("\n\n")}`;
+  try{
+    const t0=performance.now();
+    const out=await streamChat({model:jid,signal:ac.signal,messages:[{role:"user",content:prompt}],onDelta:t=>{body.innerHTML=md(t)}});
+    body.innerHTML=md(out.text);
+    meta.textContent=`${((performance.now()-t0)/1000).toFixed(1)}秒${fmtCost(out.usage)}`;
+    lastRun.summary=out.text;saveHistory();
+  }catch(e){meta.textContent="エラー";body.innerHTML=`<div class="err">${esc(e.message)}</div>`}
+  running=running.filter(x=>x!==ac);
+}
+$("#askBtn").onclick=ask;
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey))ask()});
+$("#stopBtn").onclick=()=>running.forEach(a=>a.abort());
+$("#cards").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;
+  const el=b.closest(".card"),idx=+el.dataset.idx,body=el.querySelector(".cb");
+  const act=b.dataset.act;
+  if(act==="copy"){const r=lastRun&&lastRun.results[idx];try{await navigator.clipboard.writeText(r?r.text:body.innerText);b.textContent="コピー済み"}catch(_){b.textContent="失敗"}setTimeout(()=>b.textContent="コピー",1500)}
+  if(act==="fold"){body.classList.toggle("collapsed");b.textContent=body.classList.contains("collapsed")?"ひらく":"たたむ"}
+  if(act==="retry"&&lastRun){const m=lastRun.ms[idx];el.querySelector(".meta").innerHTML='<span class="spin"></span>';body.innerHTML='<div class="think">考え中…</div>';await runOne(m,el,lastRun.q,lastRun.results);saveHistory()}
+});
+
+// ---------- history ----------
+function saveHistory(){
+  if(!lastRun) return;
+  const h=LS.get("history",[]).filter(x=>x.t!==lastRun.t);
+  h.unshift({t:lastRun.t,q:lastRun.q,genre:lastRun.genre,summary:lastRun.summary||"",results:lastRun.results.filter(Boolean).map(r=>({label:r.label,id:r.id,text:r.text,ok:r.ok}))});
+  LS.set("history",h.slice(0,30));
+}
+$("#histBtn").onclick=()=>{
+  const h=LS.get("history",[]);
+  $("#histList").innerHTML=h.length?h.map((x,i)=>`<div class="hist" data-h="${i}"><small>${new Date(x.t).toLocaleString("ja-JP")} · ${esc(x.genre)} · ${x.results.length}件</small><br>${esc(x.q.slice(0,80))}</div>`).join("")+`<button class="sm" id="clrHist" style="margin-top:12px">履歴を全部消す</button>`:'<p class="note">まだ履歴はありません。</p>';
+  $("#histDlg").showModal();
+};
+$("#histList").addEventListener("click",e=>{
+  if(e.target.id==="clrHist"){LS.set("history",[]);$("#histDlg").close();return}
+  const d=e.target.closest("[data-h]");if(!d)return;
+  const x=LS.get("history",[])[+d.dataset.h];if(!x)return;
+  $("#histDlg").close();$("#q").value=x.q;
+  const cards=$("#cards");cards.innerHTML="";$("#sumBtnWrap")?.remove();
+  if(x.summary){const s=document.createElement("article");s.className="card summary";s.innerHTML=`<div class="ch"><b>まとめ</b></div><div class="cb">${md(x.summary)}</div>`;cards.appendChild(s)}
+  x.results.forEach(r=>{const v=r.id.split("/")[0];const c=document.createElement("article");c.className="card";c.innerHTML=`<div class="ch"><span class="dot" style="background:${COLORS[v]||"#888"}"></span><b>${esc(r.label)}</b><span class="mid">${esc(r.id)}</span></div><div class="cb">${md(r.text)}</div>`;cards.appendChild(c)});
+  setStatus(`履歴: ${new Date(x.t).toLocaleString("ja-JP")}`);lastRun=null;
+});
+
+// ---------- settings ----------
+function modelOptions(sel){
+  const list=[...MODELS].sort((a,b)=>a.id.localeCompare(b.id));
+  return list.map(m=>`<option value="${esc(m.id)}" ${m.id===sel?"selected":""}>${esc(m.id)}</option>`).join("");
+}
+function openSettings(){
+  $("#keyIn").value=state.key;
+  const jid=judgeId();
+  $("#judgeSel").innerHTML=modelOptions(jid);
+  $("#slotTitle").textContent=`「${genre().name}」のメンバー（差し替え可）`;
+  $("#slots").innerHTML=members().map(m=>`<div class="slot"><span class="dot" style="background:${COLORS[m.vendor]||"#888"}"></span><span class="nm">枠${m.i+1}: ${esc(m.label)}${m.web?" 🌐":""}</span><select data-slot="${m.i}">${modelOptions(m.id)}</select></div>`).join("");
+  $("#modelInfo").textContent=MODELS.length?`利用可能なモデル: ${MODELS.length}個（OpenRouterから自動取得。各社の新モデルが出ると自動で最新版に切り替わります）`:"モデル一覧を取得できていません。通信を確認してください。";
+  $("#setDlg").showModal();
+}
+$("#setBtn").onclick=openSettings;
+$("#saveSet").onclick=()=>{
+  state.key=$("#keyIn").value.trim();LS.set("key",state.key);
+  state.judge=$("#judgeSel").value;LS.set("judge",state.judge);
+  const g=genre();const ov={};
+  document.querySelectorAll("#slots select").forEach(s=>{const i=+s.dataset.slot;const auto=resolve(g.slots[i]);if(s.value&&s.value!==auto)ov[i]=s.value});
+  state.overrides[g.id]=ov;LS.set("overrides",state.overrides);
+  $("#setDlg").close();$("#welcome").hidden=!!state.key;renderRoster();
+};
+$("#resetSlots").onclick=()=>{delete state.overrides[genre().id];LS.set("overrides",state.overrides);openSettings();renderRoster()};
+$("#refreshModels").onclick=async()=>{$("#modelInfo").textContent="更新中…";await loadModels(true);openSettings();renderRoster()};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());
+
+// ---------- boot ----------
+(async()=>{
+  $("#welcome").hidden=!!state.key;
+  renderTabs();
+  await loadModels(false);
+  renderRoster();
+  if("serviceWorker" in navigator){try{navigator.serviceWorker.register("sw.js")}catch(e){}}
+})();
+</script>
+</body>
+</html>
